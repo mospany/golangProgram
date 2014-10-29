@@ -1,6 +1,7 @@
 package main
 
 import (
+	"html/template"
 	"io"
 	"io/ioutil"
 	"log"
@@ -22,11 +23,13 @@ func isExists(path string) bool {
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		io.WriteString(w, "<html><form method=\"POST\" action=\"/upload\" "+
-			" enctype=\"multipart/form-data\">"+
-			"Choose an image to upload: <input name=\"image\" type=\"file\" />"+
-			"<input type=\"submit\" value=\"Upload\" />"+
-			"</form></html>")
+		t, err := template.ParseFiles("upload.html")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		t.Execute(w, nil)
+		return
 	}
 	if r.Method == "POST" {
 		f, h, err := r.FormFile("image")
@@ -71,12 +74,18 @@ func listHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var listHtml string
+	locals := make(map[string]interface{})
+	images := []string{}
 	for _, fileInfo := range fileInfoArr {
-		imgid := fileInfo.Name()
-		listHtml += "<li><a href=\"/view?id=" + imgid + "\">" + imgid + "</a></li> "
+		images = append(images, fileInfo.Name())
 	}
-	io.WriteString(w, "<html><ol>"+listHtml+"</ol></html>")
+	locals["images"] = images
+	t, err := template.ParseFiles("list.html")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	t.Execute(w, locals)
 }
 
 func main() {
