@@ -2,6 +2,7 @@ package main
 
 import (
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -10,6 +11,14 @@ import (
 const (
 	UPLOAD_DIR = "./uploads"
 )
+
+func isExists(path string) bool {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true
+	}
+	return os.IsExist(err)
+}
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
@@ -47,11 +56,31 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 func viewHandler(w http.ResponseWriter, r *http.Request) {
 	imageId := r.FormValue("id")
 	imagePath := UPLOAD_DIR + "/" + imageId
+	if exists := isExists(imagePath); !exists {
+		http.NotFound(w, r)
+		return
+	}
 	w.Header().Set("Content-Type", "image")
 	http.ServeFile(w, r, imagePath)
 }
 
+func listHandler(w http.ResponseWriter, r *http.Request) {
+	fileInfoArr, err := ioutil.ReadDir("./uploads")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var listHtml string
+	for _, fileInfo := range fileInfoArr {
+		imgid := fileInfo.Name()
+		listHtml += "<li><a href=\"/view?id=" + imgid + "\">" + imgid + "</a></li> "
+	}
+	io.WriteString(w, "<html><ol>"+listHtml+"</ol></html>")
+}
+
 func main() {
+	http.HandleFunc("/", listHandler)
 	http.HandleFunc("/upload", uploadHandler)
 	http.HandleFunc("/view", viewHandler)
 	err := http.ListenAndServe(":8080", nil)
